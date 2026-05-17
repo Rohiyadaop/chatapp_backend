@@ -15,12 +15,13 @@ const app = express();
 
 app.use(express.json());
 
-app.use(
-  cors({
-    origin: "*",
-    methods: ["GET", "POST"],
-  })
-);
+app.use(cors({
+  origin: [
+    "http://localhost:5173",
+    "https://app-chat-delta.vercel.app",
+  ],
+  methods: ["GET", "POST"],
+}));
 
 /* =========================
    ROUTES
@@ -50,15 +51,23 @@ const server = http.createServer(app);
    SOCKET.IO
 ========================= */
 
+// const io = new Server(server, {
+//   cors: {
+//     origin: "*",
+//     methods: ["GET", "POST"],
+//   },
+
+//   transports: ["websocket", "polling"],
+// });
 const io = new Server(server, {
   cors: {
-    origin: "*",
+    origin: [
+      "http://localhost:5173",
+      "https://app-chat-delta.vercel.app",
+    ],
     methods: ["GET", "POST"],
   },
-
-  transports: ["websocket", "polling"],
 });
-
 /* =========================
    ONLINE USERS
 ========================= */
