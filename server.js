@@ -10,19 +10,17 @@ dotenv.config();
 const app = express();
 
 /* =========================
-   CORS
+   MIDDLEWARE
 ========================= */
 
-app.use(cors({
-  origin: [
-    "http://localhost:5173",
-    "https://app-chat-delta.vercel.app",
-  ],
-  methods: ["GET", "POST"],
-  credentials: true,
-}));
-
 app.use(express.json());
+
+app.use(
+  cors({
+    origin: "*",
+    methods: ["GET", "POST"],
+  })
+);
 
 /* =========================
    ROUTES
@@ -39,11 +37,11 @@ app.use("/api/users", userRoutes);
 ========================= */
 
 app.get("/", (req, res) => {
-  res.send("Backend Running Successfully 🚀");
+  res.send("Backend Running 🚀");
 });
 
 /* =========================
-   HTTP SERVER
+   CREATE HTTP SERVER
 ========================= */
 
 const server = http.createServer(app);
@@ -53,17 +51,9 @@ const server = http.createServer(app);
 ========================= */
 
 const io = new Server(server, {
-
   cors: {
-
-    origin: [
-      "http://localhost:5173",
-      "https://app-chat-delta.vercel.app",
-    ],
-
+    origin: "*",
     methods: ["GET", "POST"],
-
-    credentials: true,
   },
 
   transports: ["websocket", "polling"],
@@ -83,7 +73,7 @@ io.on("connection", (socket) => {
 
   console.log("User Connected:", socket.id);
 
-  /* USER JOIN */
+  // USER JOIN
 
   socket.on("join", (userId) => {
 
@@ -100,48 +90,45 @@ io.on("connection", (socket) => {
     );
   });
 
-  /* SEND MESSAGE */
+  // SEND MESSAGE
 
-  socket.on("send_message", async (data) => {
+  socket.on("send_message", (data) => {
 
-    try {
+    console.log("Message:", data);
 
-      const receiverSocketId = onlineUsers.get(
-        data.receiverId
-      );
+    const receiverSocketId = onlineUsers.get(
+      data.receiverId
+    );
 
-      // SEND TO RECEIVER
-      if (receiverSocketId) {
+    // SEND TO RECEIVER
 
-        io.to(receiverSocketId).emit(
-          "receive_message",
-          data
-        );
-      }
+    if (receiverSocketId) {
 
-      // SEND BACK TO SENDER
-      socket.emit(
+      io.to(receiverSocketId).emit(
         "receive_message",
         data
       );
-
-    } catch (err) {
-
-      console.log(err);
-
     }
+
+    // SEND BACK TO SENDER
+
+    socket.emit(
+      "receive_message",
+      data
+    );
   });
 
-  /* DISCONNECT */
+  // DISCONNECT
 
   socket.on("disconnect", () => {
+
+    console.log("User Disconnected");
 
     for (const [userId, socketId] of onlineUsers.entries()) {
 
       if (socketId === socket.id) {
 
         onlineUsers.delete(userId);
-
       }
     }
 
@@ -149,8 +136,6 @@ io.on("connection", (socket) => {
       "online_users",
       Array.from(onlineUsers.keys())
     );
-
-    console.log("User Disconnected");
   });
 });
 
@@ -159,12 +144,20 @@ io.on("connection", (socket) => {
 ========================= */
 
 mongoose
-.connect(process.env.MONGO_URI)
-.then(() => console.log("MongoDB Connected"))
-.catch((err) => console.log(err));
+  .connect(process.env.MONGO_URI)
+  .then(() => {
+
+    console.log("MongoDB Connected");
+
+  })
+  .catch((err) => {
+
+    console.log(err);
+
+  });
 
 /* =========================
-   SERVER START
+   START SERVER
 ========================= */
 
 const PORT = process.env.PORT || 5000;
