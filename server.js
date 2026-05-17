@@ -9,93 +9,168 @@ dotenv.config();
 
 const app = express();
 
-app.use(cors());
+/* =========================
+   CORS
+========================= */
+
+app.use(cors({
+  origin: [
+    "http://localhost:5173",
+    "https://app-chat-delta.vercel.app",
+  ],
+  methods: ["GET", "POST"],
+  credentials: true,
+}));
+
 app.use(express.json());
 
+/* =========================
+   ROUTES
+========================= */
+
 const authRoutes = require("./routes/authRoutes");
+const userRoutes = require("./routes/userRoutes");
 
 app.use("/api/auth", authRoutes);
+app.use("/api/users", userRoutes);
 
+/* =========================
+   HOME ROUTE
+========================= */
 
-// Create HTTP Server
-const server = http.createServer(app);
-
-// Setup Socket.IO
-const io = new Server(server, {
-  cors: {
-    origin: "https://app-chat-delta.vercel.app",
-    methods: ["GET", "POST"],
-  },
+app.get("/", (req, res) => {
+  res.send("Backend Running Successfully 🚀");
 });
 
+/* =========================
+   HTTP SERVER
+========================= */
 
-// MongoDB Connection
-mongoose
-.connect(process.env.MONGO_URI)
-.then(() => console.log("MongoDB Connected"))
-.catch((err) => console.log(err));
+const server = http.createServer(app);
+
+/* =========================
+   SOCKET.IO
+========================= */
+
+const io = new Server(server, {
+
+  cors: {
+
+    origin: [
+      "http://localhost:5173",
+      "https://app-chat-delta.vercel.app",
+    ],
+
+    methods: ["GET", "POST"],
+
+    credentials: true,
+  },
+
+  transports: ["websocket", "polling"],
+});
+
+/* =========================
+   ONLINE USERS
+========================= */
 
 const onlineUsers = new Map();
+
+/* =========================
+   SOCKET CONNECTION
+========================= */
+
 io.on("connection", (socket) => {
 
   console.log("User Connected:", socket.id);
 
-  // USER JOINS
+  /* USER JOIN */
+
   socket.on("join", (userId) => {
 
     onlineUsers.set(userId, socket.id);
 
-    // SEND ONLINE USERS TO EVERYONE
-    io.emit("online_users", Array.from(onlineUsers.keys()));
+    io.emit(
+      "online_users",
+      Array.from(onlineUsers.keys())
+    );
 
-    console.log("Online Users:", onlineUsers);
-
+    console.log(
+      "Online Users:",
+      Array.from(onlineUsers.keys())
+    );
   });
 
-  // SEND MESSAGE
-  socket.on("send_message", (data) => {
+  /* SEND MESSAGE */
 
-    const receiverSocketId = onlineUsers.get(data.receiverId);
+  socket.on("send_message", async (data) => {
 
-    if (receiverSocketId) {
+    try {
 
-      io.to(receiverSocketId).emit("receive_message", data);
+      const receiverSocketId = onlineUsers.get(
+        data.receiverId
+      );
+
+      // SEND TO RECEIVER
+      if (receiverSocketId) {
+
+        io.to(receiverSocketId).emit(
+          "receive_message",
+          data
+        );
+      }
+
+      // SEND BACK TO SENDER
+      socket.emit(
+        "receive_message",
+        data
+      );
+
+    } catch (err) {
+
+      console.log(err);
 
     }
-
-    socket.emit("receive_message", data);
-
   });
 
-  // DISCONNECT
+  /* DISCONNECT */
+
   socket.on("disconnect", () => {
 
     for (const [userId, socketId] of onlineUsers.entries()) {
 
       if (socketId === socket.id) {
+
         onlineUsers.delete(userId);
+
       }
     }
 
-    io.emit("online_users", Array.from(onlineUsers.keys()));
+    io.emit(
+      "online_users",
+      Array.from(onlineUsers.keys())
+    );
 
     console.log("User Disconnected");
-
   });
 });
 
+/* =========================
+   DATABASE
+========================= */
 
-const userRoutes = require("./routes/userRoutes");
-app.use("/api/users", userRoutes);
-app.get("/", (req, res) => {
+mongoose
+.connect(process.env.MONGO_URI)
+.then(() => console.log("MongoDB Connected"))
+.catch((err) => console.log(err));
 
-  res.send("Backend Running Successfully 🚀");
+/* =========================
+   SERVER START
+========================= */
 
-});
-
-// Start Server
 const PORT = process.env.PORT || 5000;
 
 server.listen(PORT, () => {
+
   console.log(`Server running on port ${PORT}`);
+
 });
