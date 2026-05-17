@@ -87,7 +87,10 @@ io.on("connection", (socket) => {
 
 const userRoutes = require("./routes/userRoutes");
 app.use("/api/users", userRoutes);
-
+app.post("/",(req,res)=>{
+  return res.status(404).json({ message: "backend is running" });
+}
+);
 
 // Start Server
 const PORT = process.env.PORT || 5000;
